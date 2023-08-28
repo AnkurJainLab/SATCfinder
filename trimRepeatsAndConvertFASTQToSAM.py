@@ -1,10 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Aug 19 23:44:55 2020
+#!/usr/bin/env python
 
-@author: Rachel Anderson
-"""
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s', datefmt='%d-%m-%y %H:%M:%S', level=logging.INFO)
 import commonFunctions as CF
@@ -51,32 +46,20 @@ def main():
 def removeRepeatsAndConvertFASTQToSAM(_args):
     logging.info(f"Starting run with options {_args}")
     _tStart = time.time()
-    # Structure for every read:
-    _readBlank = {'read': "",
-                  'phred': "",
-                  'ID': "",
-                  'repeatFwdSequence': "*",
-                  'repeatFwdLength': 0,
-                  'repeatFwdPhred': "*",
-                  'repeatRevSequence': "*",
-                  'repeatRevLength': 0,
-                  'repeatRevPhred': "*",
-                  'UMI': "*",
-                  'UMIphred': "*"}
-    _read2 = copy.deepcopy(_readBlank)  # In case read2 is not provided, initialize as blank for calculations later
+
     _repeatDistribution = np.zeros(100)
     _i = 0
     _numReads = 0
-    _data = {}
+    _processedReads = {}
     _readOutcomes = {'tooShort': 0, 'noRepeat': 0, 'good': 0}
     _position = 0
+
     # Build the repeats, allowing for degenerate IUPAC bases
     (_repeatForward, _repeatReverse) = CF.parseDegenerateSequence(_args.repeatSequence)
     _findFwdRepeat = re.compile(r'(' + _repeatForward + '){' + str(_args.minRepeats) + ',}')
     _findRevRepeat = re.compile(r'(' + _repeatReverse + '){' + str(_args.minRepeats) + ',}')
 
     # Open both input files (paired end) and create the output sam file
-    # using popen because it is slightly faster than built-in gzip. Not a lot, but..
     _fileOut = gzip.open(_args.outSAM, 'wt', compresslevel=2)
     # Write SAM header
     _fileOut.write("@HD\t"
@@ -92,135 +75,80 @@ def removeRepeatsAndConvertFASTQToSAM(_args):
     if _args.inFASTQ2:
         _fileIn2 = gzip.open(_args.inFASTQ2, "rt")
     else:
-        # This is a hack to allow us to iterate over either 1 or 2 files with the same code
+        # This allows us to iterate over either 1 or 2 files with the same code
         _fileIn2 = [None]
     for _lineIn1, _lineIn2 in zip_longest(_fileIn1, _fileIn2):
-        # Expected format is roughly:
-        # @SRR8393695.1 1/1
-        # CTGGCGGCCGCGGGGACCAGCCGCGCTTTCAGCAGCACCACGGCCAGGCCGAGAAGCAGGGTGCAGGGGACACGCCGGCAGAGCCTCGCCATGGCCTAGAG
-        # +
-        # AAAFFJJJJJJJJJJJJJJJJJJJJJJJJJJFJJJJJJJJJJJJJJJJJJJFJJJJJJJJJJJJJJJJJJJJJJJJAFFJJJJJJJJJJJJJJJJJJJJJJ
-
-        # Logic here:
-        #   Line 1: save the ID; skip the rest.
-        #   Line 2: save the read seq; skip the rest.
-        #   Line 3: skip everything entirely.
-        #   Line 4: save phred.
-        #   Process all four lines into SAM format.
-        # Repeat.
+        # Phase 1: read FASTQ in groups of 4 lines, for both reads
         if _position == 0:
-            _read1 = copy.deepcopy(_readBlank)
-            _read1['ID'] = _lineIn1.strip().replace('@', '').replace(' ', '_')  # Handle spaces in names
-
-            if _lineIn2:
-                _read2 = copy.deepcopy(_readBlank)
-                _read2['ID'] = _lineIn2.strip().replace('@', '').replace(' ', '_')
-            _position += 1
-            continue
-
-        if _position == 1:
-            _read1['read'] = _lineIn1.strip()
-            if _lineIn2:
-                _read2['read'] = _lineIn2.strip()
-            _position += 1
-            continue
-
-        if _position == 2:
-            _position += 1
-            continue
+            _lines = [["", ""],
+                      ["", ""],
+                      ["", ""],
+                      ["", ""]]
+        _lines[_position][0] = _lineIn1
+        _lines[_position][1] = _lineIn2
 
         if _position == 3:
-            _read1['phred'] = _lineIn1.strip()
-            if _lineIn2:
-                _read2['phred'] = _lineIn2.strip()
             _position = 0
             _numReads += 1
+        else:
+            _position += 1
+            continue
+
+        # Phase 2: process reads
+        _read1, _read2 = createFASTQreads(_lines)
 
         # Let's not store too much in memory
         if _numReads % 1000000 == 0:
             logging.info(f"{_numReads // 1000000}M reads trimmed in {round(time.time() - _tStart, 0)} seconds")
-            writeRecordsToDisk(_fileOut, _data, _args)
-            del _data
-            _data = {}
-        # Sometimes open fails silently (with empty lines) rather than stopping at end of file.
+            writeRecordsToDisk(_fileOut, _processedReads, _args)
+            del _processedReads
+            _processedReads = {}
+
+        # Sometimes open(file) fails silently with empty lines rather than stopping at end of file.
         # Check for empty line and abort if found
         if _read1['ID'] == "":
             break
 
-        if _args.UMIlength > 0:
-            # Trim and save UMI from both read and phred
-            _read1['UMI'] = _read1['read'][0:_args.UMIlength]
-            _read1['UMIphred'] = _read1['phred'][0:_args.UMIlength]
-            _read1['read'] = _read1['read'][_args.UMIlength:]
-            _read1['phred'] = _read1['phred'][_args.UMIlength:]
-
-        # Assume we throw out reads, only keep if we find a repeat of sufficient length
-        _hit = False
-        _readNum = 1
-        for _whichRead in [_read1, _read2]:
-            if (_readNum == 2) and not _lineIn2:
-                continue
-            _fwdRepeatMatches = re.search(_findFwdRepeat, _whichRead['read'])
-            if _fwdRepeatMatches is not None:
-                _hit = True
-                _start = _fwdRepeatMatches.start(0)
-                _whichRead['repeatFwdSequence'] = _whichRead['read'][_start:]
-                _whichRead['repeatFwdPhred'] = _whichRead['phred'][_start:]
-                _whichRead['repeatFwdLength'] = (_fwdRepeatMatches.end(0) - _start) // 3
-                _whichRead['read'] = _whichRead['read'][:_start]
-                _whichRead['phred'] = _whichRead['phred'][:_start]
-
-            # Skip to last instance of repeat in read. Fix for interrupted repeats
-            _revRepeatMatches = re.finditer(_findRevRepeat, _whichRead['read'])
-            _result = None
-            for _result in _revRepeatMatches:
-                pass
-
-            if _result is not None:
-                _hit = True
-                _end = _result.end(0)
-                _whichRead['repeatRevSequence'] = _whichRead['read'][:_end]
-                _whichRead['repeatRevPhred'] = _whichRead['phred'][:_end]
-                _whichRead['repeatRevLength'] = (_end - _result.start(0)) // 3
-                _whichRead['read'] = _whichRead['read'][_end:]
-                _whichRead['phred'] = _whichRead['phred'][_end:]
-            _readNum = 2
+        _read1, _read2, _maxRepeatLength = processReads(_args, _read1, _read2, _findFwdRepeat, _findRevRepeat)
 
         # Save repeat length distribution (optional statistics)
-        _repeatDistribution[max([_read1['repeatRevLength'], _read1['repeatFwdLength'], _read2['repeatRevLength'],
-                                 _read2['repeatFwdLength']])] += 1
+        _repeatDistribution[_maxRepeatLength] += 1
 
         # if we got a match, save the read(s)
-        if _hit | _args.keepAllReads:
-            if len(_read1['read']) != len(_read1['phred']):
-                logging.error("Fatal error: Read has mismatched sequence and phred lengths", _read1)
-                break
-            if _lineIn2 and (len(_read2['read']) != len(_read2['phred'])):
-                logging.error("Fatal error: Read has mismatched sequence and phred lengths", _read2)
-                break
-            # 0-length reads kill STAR. Also, short reads aren't mappable
-            if not _lineIn2:
-                if len(_read1['read']) >= _args.minReadLengthAfterTrim:
-                    _data[_i] = _read1
-                    _i += 1
-                    _readOutcomes['good'] += 1
-                else:
-                    _readOutcomes['tooShort'] += 1
-            elif len(_read1['read']) >= _args.minReadLengthAfterTrim and \
-                    len(_read2['read']) >= _args.minReadLengthAfterTrim:
-                _data[_i] = _read1
-                _data[_i + 1] = _read2
-                _i += 2
-                _readOutcomes['good'] += 1
-            else:
-                _readOutcomes['tooShort'] += 1
-        else:
+        if not (_maxRepeatLength >= _args.minRepeats | _args.keepAllReads):
             _readOutcomes['noRepeat'] += 1
             # We didn't find anything. Continue!
             continue
 
+        # Error checking (not mappable by STAR)
+        if len(_read1['read']) != len(_read1['phred']):
+            logging.error("Fatal error: Read 1 has mismatched sequence and phred lengths")
+            logging.error(_read1)
+            break
+        if _lineIn2 and (len(_read2['read']) != len(_read2['phred'])):
+            logging.error("Fatal error: Read 2 has mismatched sequence and phred lengths")
+            logging.error(_read2)
+            break
+
+        # 0-length reads kill STAR and short reads aren't mappable
+        if not _lineIn2:
+            if len(_read1['read']) >= _args.minReadLengthAfterTrim:
+                _processedReads[_i] = _read1
+                _i += 1
+                _readOutcomes['good'] += 1
+            else:
+                _readOutcomes['tooShort'] += 1
+        elif len(_read1['read']) >= _args.minReadLengthAfterTrim and \
+                len(_read2['read']) >= _args.minReadLengthAfterTrim:
+            _processedReads[_i] = _read1
+            _processedReads[_i + 1] = _read2
+            _i += 2
+            _readOutcomes['good'] += 1
+        else:
+            _readOutcomes['tooShort'] += 1
+
     # Write any remaining SAM entries
-    writeRecordsToDisk(_fileOut, _data, _args)
+    writeRecordsToDisk(_fileOut, _processedReads, _args)
     _fileOut.close()
 
     _tEnd = time.time()
@@ -243,8 +171,91 @@ def removeRepeatsAndConvertFASTQToSAM(_args):
             for _i in range(0, len(_repeatDistribution)):
                 _logFileOut.write(f"{_i},{_repeatDistribution[_i]}\n")
 
+def createFASTQreads(_lines):
+    # Structure for every read:
+    _readBlank = {'read': "",
+                  'phred': "",
+                  'ID': "",
+                  'repeatFwdSequence': "*",
+                  'repeatFwdLength': 0,
+                  'repeatFwdPhred': "*",
+                  'repeatRevSequence': "*",
+                  'repeatRevLength': 0,
+                  'repeatRevPhred': "*",
+                  'UMI': "*",
+                  'UMIphred': "*"}
 
-def writeRecordsToDisk(_fileOut, _data, _args):
+    _read1 = copy.deepcopy(_readBlank)
+    _read2 = copy.deepcopy(_readBlank)
+    # Expected format is four lines for each read and mate, roughly:
+    # @SRR8393695.1 1/1
+    # CTGGCGGCCGCGGGGACCAGCCGCGCTTTCAGCAGCACCACGGCCAGGCCGAGAAGCAGGGTGCAGGGGACACGCCGGCAGAGCCTCGCCATGGCCTAGAG
+    # +
+    # AAAFFJJJJJJJJJJJJJJJJJJJJJJJJJJFJJJJJJJJJJJJJJJJJJJFJJJJJJJJJJJJJJJJJJJJJJJJAFFJJJJJJJJJJJJJJJJJJJJJJ
+    _numRead = 0
+    for _whichRead in [_read1, _read2]:
+        if (_numRead == 1) and (_lines[0][1] is None):
+            # No read 2, skip
+            continue
+        #   Line 1: save the ID; skip the rest.
+        _whichRead['ID'] = _lines[0][_numRead].strip().replace('@', '').replace(' ', '_')  # Handle spaces in names
+        #   Line 2: save the read seq; skip the rest.
+        _whichRead['read'] = _lines[1][_numRead].strip()
+        #   Line 3: skip everything entirely.
+        #   Line 4: save phred.
+        _whichRead['phred'] = _lines[3][_numRead].strip()
+        _numRead = 1
+
+    return _read1, _read2
+
+
+def processReads(_args, _read1, _read2, _findFwdRepeat, _findRevRepeat):
+    # Do some string math to trim the repeats.
+    _readNum = 1
+    for _whichRead in [_read1, _read2]:
+        if (_readNum == 2) and _whichRead['ID'] == '':
+            continue
+
+        if _args.UMIlength > 0:
+            # Trim and save UMI from both read and phred
+            _whichRead['UMI'] = _whichRead['read'][0:_args.UMIlength]
+            _whichRead['UMIphred'] = _whichRead['phred'][0:_args.UMIlength]
+            _whichRead['read'] = _whichRead['read'][_args.UMIlength:]
+            _whichRead['phred'] = _whichRead['phred'][_args.UMIlength:]
+
+        _fwdRepeatMatches = re.search(_findFwdRepeat, _whichRead['read'])
+        if _fwdRepeatMatches is not None:
+            _hit = True
+            _start = _fwdRepeatMatches.start(0)
+            _whichRead['repeatFwdSequence'] = _whichRead['read'][_start:]
+            _whichRead['repeatFwdPhred'] = _whichRead['phred'][_start:]
+            _whichRead['repeatFwdLength'] = (_fwdRepeatMatches.end(0) - _start) // 3
+            _whichRead['read'] = _whichRead['read'][:_start]
+            _whichRead['phred'] = _whichRead['phred'][:_start]
+
+        # Skip to last instance of repeat in read. Fix for interrupted repeats
+        _revRepeatMatches = re.finditer(_findRevRepeat, _whichRead['read'])
+        _result = None
+        for _result in _revRepeatMatches:
+            pass
+
+        if _result is not None:
+            _hit = True
+            _end = _result.end(0)
+            _whichRead['repeatRevSequence'] = _whichRead['read'][:_end]
+            _whichRead['repeatRevPhred'] = _whichRead['phred'][:_end]
+            _whichRead['repeatRevLength'] = (_end - _result.start(0)) // 3
+            _whichRead['read'] = _whichRead['read'][_end:]
+            _whichRead['phred'] = _whichRead['phred'][_end:]
+        _readNum = 2
+
+    return _read1, _read2, max([_read1['repeatRevLength'],
+                                _read1['repeatFwdLength'],
+                                _read2['repeatRevLength'],
+                                _read2['repeatFwdLength']])
+
+
+def writeRecordsToDisk(_file, _data, _args):
     for _line in _data.values():
         _output = [_line['ID'],
                    "0",
@@ -267,7 +278,7 @@ def writeRecordsToDisk(_fileOut, _data, _args):
                    'RX:Z:' + _line['UMI'],
                    'pX:Z:' + _line['UMIphred']]
 
-        _fileOut.write('\t'.join(_output) + "\n")
+        _file.write('\t'.join(_output) + "\n")
 
 
 if __name__ == "__main__":

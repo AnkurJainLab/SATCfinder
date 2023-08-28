@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s', datefmt='%d-%m-%y %H:%M:%S',
                         level=logging.INFO)
@@ -14,7 +16,7 @@ from commonFunctions import *
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description='Mate-aware trimming of repeats from reads')
+    parser = argparse.ArgumentParser(description='Find desired repeats on genome and add them to annotation GTF file')
     parser.add_argument('--genomeFASTA', type=str, default="", required=True,
                         help='Path to genome FASTA file')
     parser.add_argument('--gtfFile', type=str, default="", required=True,
