@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+'''Find desired repeats on genome'''
+__command = 'annotate'
 
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s', datefmt='%d-%m-%y %H:%M:%S',
@@ -15,22 +17,20 @@ import argparse
 from commonFunctions import *
 
 
-def main(argv):
-    parser = argparse.ArgumentParser(description='Find desired repeats on genome and add them to annotation GTF file')
-    parser.add_argument('--genomeFASTA', type=str, default="", required=True,
+def addArgs(_parser):
+    _parser.add_argument('--genomeFASTA', type=str, default="", required=True,
                         help='Path to genome FASTA file')
-    parser.add_argument('--gtfFile', type=str, default="", required=True,
+    _parser.add_argument('--gtfFile', type=str, default="", required=True,
                         help='Path to genome annotation file (GTF format)')
-    parser.add_argument('--outFile', type=str, default="", required=True,
+    _parser.add_argument('--outFile', type=str, default="", required=True,
                         help='File path to save output dataframe')
-    parser.add_argument('--minRepeats', type=int, default="3", required=True,
+    _parser.add_argument('--minRepeats', type=int, default="3", required=True,
                         help='Minimum # of times sequence must be repeated without interruption')
-    parser.add_argument('--repeatSequence', type=str, default="CAG", required=True,
+    _parser.add_argument('--repeatSequence', type=str, default="CAG", required=True,
                         help='Forward repeat to find in genome. Reverse complement is also searched. '
                              'Degenerate IUPAC bases [RYSWKMBDHVN] are accepted but may significantly increase runtime')
 
-    args = parser.parse_args()
-    findRepeatsInGenome(args)
+    return _parser
 
 
 def parseGTF(_dataframe):
@@ -253,5 +253,5 @@ def findRepeatsInGenome(_args):
     logging.info(f"Done!")
 
 
-if __name__ == "__main__":
-    main(sys.argv[1:])
+def main(_args):
+    logging.info(f'Starting {__command} module')

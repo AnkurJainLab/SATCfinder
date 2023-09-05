@@ -4,7 +4,7 @@
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s : %(message)s', datefmt='%d-%m-%y %H:%M:%S', level=logging.INFO)
 
-VERSION = 0.1
+__version = 0.1
 
 def getReverseComplement(sequence):
     # First, create a list of the complementary bases

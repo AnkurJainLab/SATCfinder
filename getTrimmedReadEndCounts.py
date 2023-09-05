@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+'''Find trimmed ends in aligned BAM file'''
+__command = 'ends'
 
 import argparse
 import pysam
@@ -7,12 +9,12 @@ import re
 import logging
 
 
-def main():
-    _parser = argparse.ArgumentParser(prog='getTrimmedReadEndCounts',
+def addArgs(_parser):
+    _parser = argparse.ArgumentParser(prog='SATCfinder ends',
+                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                       description='Module for SATCfinder which locates trimmed ends in a region. '
                                                   'Outputs a text file with 1-indexed base coordinate of trimmed ends '
                                                   'and number of ends at that base.')
-
     _parser.add_argument('--inBAM', type=str, default="", required=True,
                          help='Input BAM file to search for trimmed ends. The BAM file should have been processed by '
                               'SATCfinder (e.g. it should have SAM attributes tL/aL to indicate the number of repeats'
@@ -23,13 +25,11 @@ def main():
                          help='Chromosome region to process, for example: chr4:3073876-3075876')
     _parser.add_argument('--minRepeats', type=int, default=3, required=False,
                          help='Minimum # of repeats required to output. Default 3')
-    _parser.add_argument('--ignoreSecondary', action='store_true', help='If present, ignore secondary alignments of'
-                                                                        'multimapping reads, but include '
-                                                                        'primary alignments.')
-    _parser.add_argument('--ignoreMultimapping', action='store_true', help='If present, ignore multimapping reads.')
-
-    _args = _parser.parse_args()
-    find3PrimeEnds(_args)
+    _parser.add_argument('--ignoreSecondary', action='store_true',
+                         help='If present, ignore secondary alignments of multimapping reads, but include primary '
+                              'alignments.')
+    _parser.add_argument('--ignoreMultimapping', action='store_true', help='If present, ignore all multimapping reads.')
+    return _parser
 
 
 def find3PrimeEnds(_args):
@@ -77,5 +77,5 @@ def find3PrimeEnds(_args):
     logging.info(f"Done! Looked at {_totalReads}.")
 
 
-if __name__ == "__main__":
-    main()
+def main(_args):
+    logging.info(f'Starting {__command} module')

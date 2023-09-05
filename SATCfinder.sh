@@ -1,91 +1,111 @@
 #!/bin/bash
+set -e                        # Exit immediately on errors
 #########################################################################################
-################# These variables you should change for your datasets. ##################
+##################### Configure these variables for your datasets. ######################
 #########################################################################################
-#Name this dataset
-datasetPrefix=HEK-test
-
-## Define your repeat type and the minimum number of tandem repeats. IUPAC bases OK
-repeatType=CAG
-minRepeatLength=3
+datasetPrefix=HEK-test        # Name this dataset
+repeatType="CAG"              # Define your repeat type. Degenerate IUPAC bases are OK
+minRepeatLength=3             # How many repeats to search & trim?
+numCores=4                    # How many cores to run with?
+removeTemporaryFiles=true     # Clean up temporary files created by this script?
 
 #Set up some file paths
 #Your raw reads, such as the small example dataset
-rawRead1=./WT_HEK_1.fq.gz
-rawRead1=./WT_HEK_2.fq.gz
-#The output directory. This will be made if necessary
+rawRead1=~/SATCfinder/WT_HEK_1.fq.gz
+rawRead2=~/SATCfinder/WT_HEK_2.fq.gz
+#The output directory. This will be made if it does not exist
 outputDir=/lab/jain_imaging/Rachel/STARoutput/test
-#Path to tools
-bbdukDir=~/tools/bbmap_38.86/bbmap
-SATCfinderDir=~/SATCfinder/
+
 #Your STAR genome directory
 genomeDir=/lab/jain_imaging/genomes/hg38_with_rRNA_overhang_100/
-#If you need a spike-in fasta file, like for mapping to a plasmid, add the path to the fasta here.
-fasta=""
-
-#How many cores to run with
-numCores=4
+#If you need a spike-in fasta file, e.g. for mapping to a plasmid, add the path to the fasta file here.
+fastaPath=""
+#Directory for bbtools (https://sourceforge.net/projects/bbmap/)
+bbdukDir=~/tools/bbmap_38.86/bbmap
+#Directory for SATCfinder scripts. This is assumed to be the same directory as this script, but can be changed
+SATCfinderDir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+#Directory for STAR executable, if not in $PATH
+STARDir=""
+#Directory for cutadapt, if not in $PATH
+cutadaptDir=""
 
 #########################################################################################
-##################### Here's where the SATCfinder pipeline begins #######################
+########## Begin SATCfinder pipeline. You should not need to edit this section ##########
 #########################################################################################
-#Make sure output dir exists
-mkdir -p ${outputDir}
+#Set up paths for executables
+outputDir=${outputDir%%+(/)}  # Remove trailing slash if present
+mkdir -p ${outputDir}         # Make sure output dir exists
+
+#Fix paths to have one trailing slash if needed
+bbdukDir=${bbdukDir%%+(/)}
+cutadaptDir=${cutadaptDir%%+(/)}
+if [[ ${#cutadaptDir} -gt 0 ]]; then cutadaptPath=${cutadaptDir}/cutadapt; else cutadaptPath="cutadapt"; fi
+STARDir=${STARDir%%+(/)}
+if [[ ${#STARDir} -gt 0 ]]; then STARPath=${STARDir}/STAR; else STARPath="STAR"; fi
+if [[ ${#fasta} -gt 0 ]]; then fasta="--genomeFastaFiles ${fastaPath}"; fi
 
 #Generate a repeat string for bbduk
 repeatSeq=`for i in $(seq 1 ${minRepeatLength}); do printf "${repeatType}"; done`
 
-#Select reads with repeats using bbduk
+# Select reads with repeats using bbduk
 ${bbdukDir}/bbduk.sh \
-			in=${rawRead1} \
-			in2=${rawRead2} \
-			outm=${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz \
-			outm2=${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz \
-			k=${#repeatSeq} \
-			literal=${repeatSeq} \
-			rcomp=t copyundefined hdist=0 mm=f \
-			stats=${outputDir}/${datasetPrefix}_bbduk.log
+    in=${rawRead1} \
+    in2=${rawRead2} \
+    outm=${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz \
+    outm2=${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz \
+    k=${#repeatSeq} \
+    literal=${repeatSeq} \
+    rcomp=t copyundefined hdist=0 mm=f \
+    stats=${outputDir}/${datasetPrefix}_bbduk.log
 
-#remove sequencing adapters. This should work for illumina-type adapters
-cutadapt -a AGATCGGAAGAG \
-      -o ${outputDir}/${datasetPrefix}_cutadapt_1.fastq.gz \
-      -p ${outputDir}/${datasetPrefix}_cutadapt_2.fastq.gz \
-			--cores=${numCores} \
-			--error-rate=0.1 \
-			--times=1 \
-			--overlap=5 \
-			--minimum-length=20 \
-			--quality-cutoff=20 \
-			${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz \
-			${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz
+# Remove sequencing adapters. This sequence provided is for Illumina-type adapters
+${cutadaptPath} -a AGATCGGAAGAG \
+    -o ${outputDir}/${datasetPrefix}_bbduk_cutadapt_1.fastq.gz \
+    -p ${outputDir}/${datasetPrefix}_bbduk_cutadapt_2.fastq.gz \
+    --cores=${numCores} \
+    --error-rate=0.1 \
+    --times=1 \
+    --overlap=5 \
+    --minimum-length=20 \
+    --quality-cutoff=20 \
+    ${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz \
+    ${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz
 
-${SATCfinderDir}/trimRepeatsAndConvertFASTQToSAM.py --sra=${study} --disease=${ID} \
-			--in1=${outputDir}/${datasetPrefix}_bbduk_cutadapt_1.fastq.gz \
-			--in2=${outputDir}/${datasetPrefix}_bbduk_cutadapt_2.fastq.gz \
-			--out=${outputDir}/${datasetPrefix}.sam.gz \
-			--minRepeats=${minRepeatLength} --repeatSequence=${repeatType} \
-			--log=${outputDir}/${datasetPrefix}_repeatselected.log
+# Move repeats to headers
+${SATCfinderDir}/SATCfinder.py trim \
+    --inFASTQ1=${outputDir}/${datasetPrefix}_bbduk_cutadapt_1.fastq.gz \
+    --inFASTQ2=${outputDir}/${datasetPrefix}_bbduk_cutadapt_2.fastq.gz \
+    --outSAM=${outputDir}/${datasetPrefix}.sam.gz \
+    --minRepeats=${minRepeatLength} \
+    --repeatSequence=${repeatType} \
+    --outLog=${outputDir}/${datasetPrefix}_SATCfinder.log
 
-STAR --genomeDir ${genomeDir} \
-			--runThreadN ${numCores} ${fasta}\
-			--readFilesCommand zcat \
-			--readFilesType SAM PE \
-			--readFilesIn ${outputDir}/${datasetPrefix}.sam.gz \
-			--outFileNamePrefix ${outputDir}/${datasetPrefix}_ \
-			--outSAMtype BAM SortedByCoordinate --outSAMunmapped Within
+# Align non-repetitive portion of reads to genome
+${STARPath} --genomeDir ${genomeDir} \
+    --runThreadN ${numCores} ${fasta}\
+    --readFilesCommand zcat \
+    --readFilesType SAM PE \
+    --readFilesIn ${outputDir}/${datasetPrefix}.sam.gz \
+    --outFileNamePrefix ${outputDir}/${datasetPrefix}_ \
+    --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within
 
-#Cleanup
+# Cleanup
+# Make the output BAM file name nicer
 mv ${outputDir}/${datasetPrefix}_Aligned.sortedByCoord.out.bam ${outputDir}/${datasetPrefix}.bam
+# Index BAM file
 samtools index ${outputDir}/${datasetPrefix}.bam
-#Select only reads that had repeats (ignore the mates)
+# Select only reads that had repeats (ignore the mates) and stick them in a new indexed BAM file
 samtools view -h -F 256 ${outputDir}/${datasetPrefix}.bam \
-      | awk -F'\t' '{if((substr(\$1, 0, 1) == \"@\" || ((\$0 !~ /tL\:i\:0/) || (\$0 !~ /aL\:i\:0/)))){print \$0}}' \
-      | samtools view -b >| ${outputDir}/${datasetPrefix}_selected_3x.bam
+    | awk -F'\t' '{if((substr($1, 0, 1) == "@" || (($0 !~ /tL\:i\:0/) || ($0 !~ /aL\:i\:0/)))){print $0}}' \
+    | samtools view -b >| ${outputDir}/${datasetPrefix}_selected_3x.bam
 samtools index ${outputDir}/${datasetPrefix}_selected_3x.bam
-samtools index ${outputDir}/${datasetPrefix}_selected_4x.bam
-rm -I ${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz
-rm -I ${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz
-rm -I ${outputDir}/${datasetPrefix}_bbduk_cutadapt_1.fastq.gz
-rm -I ${outputDir}/${datasetPrefix}_bbduk_cutadapt_2.fastq.gz
-rm -I ${outputDir}/${datasetPrefix}.sam.gz
-find ${outputDir}/${datasetPrefix}__STARtmp -type d -empty -delete
+
+# Remove temporary files
+if [ removeTemporaryFiles == true ]; then
+    rm -I ${outputDir}/${datasetPrefix}_bbduk_1.fastq.gz
+    rm -I ${outputDir}/${datasetPrefix}_bbduk_2.fastq.gz
+    rm -I ${outputDir}/${datasetPrefix}_bbduk_cutadapt_1.fastq.gz
+    rm -I ${outputDir}/${datasetPrefix}_bbduk_cutadapt_2.fastq.gz
+    rm -I ${outputDir}/${datasetPrefix}.sam.gz
+    find ${outputDir}/${datasetPrefix}__STARtmp -type d -empty -delete
+fi
