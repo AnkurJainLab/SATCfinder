@@ -18,9 +18,9 @@ from commonFunctions import *
 
 
 def addArgs(_parser):
-    _parser.add_argument('--genomeFASTA', type=str, default="", required=True,
+    _parser.add_argument('--inFASTAfile', type=str, default="", required=True,
                         help='Path to genome FASTA file')
-    _parser.add_argument('--gtfFile', type=str, default="", required=True,
+    _parser.add_argument('--inGTFfile', type=str, default="", required=True,
                         help='Path to genome annotation file (GTF format)')
     _parser.add_argument('--outFile', type=str, default="", required=True,
                         help='File path to save output dataframe')
@@ -36,7 +36,7 @@ def addArgs(_parser):
 def parseGTF(_dataframe):
     _tStart = time.time()
     _feature = {'chr': '', 'name': '', 'id': '', 'type': '', 'featureStart': 0, 'featureEnd': 0,
-                'strand': '', 'repeatStart': 0, 'repeatLength': 0, 'exonNumber': -1, 'transcript': ''}
+                'strand': '', 'repeatStart': 0, 'repeatLength': 0, 'featureNumber': -1, 'transcript': ''}
     _numFeatures = 0
 
     _featureList = {}
@@ -111,7 +111,7 @@ def parseGTF(_dataframe):
                 _f['type'] = "exon"
                 _f['repeatStart'] = -1
                 _f['repeatLength'] = -1
-                _f['exonNumber'] = _exon['exon_number']
+                _f['featureNumber'] = _exon['exon_number']
                 _f['featureStart'] = _exon['start']
                 _f['featureEnd'] = _exon['end']
                 _f['transcript'] = _whichTranscript
@@ -149,7 +149,7 @@ def parseGTF(_dataframe):
                 else:
                     _f['featureStart'] = _previousExonEnd + 1
                     _f['featureEnd'] = _exon['featureStart'] - 1
-                    _f['exonNumber'] = _intronNum
+                    _f['featureNumber'] = _intronNum
                     _intronNum += 1
                     _featureList[_numFeatures] = copy.deepcopy(_f)
                     _numFeatures += 1
@@ -167,7 +167,7 @@ def findAllRepeats(_args):
     _tStart = time.time()
     _CHROMOSOME = {}
 
-    for _whichChromosome in SeqIO.parse(_args.genomeFASTA, "fasta"):
+    for _whichChromosome in SeqIO.parse(_args.inFASTAfile, "fasta"):
         logging.info(f"Parsing {_whichChromosome.id} / {len(_whichChromosome)} bp")
         _CHROMOSOME[_whichChromosome.id] = {}
         _CHROMOSOME[_whichChromosome.id]['ID'] = _whichChromosome.id
@@ -175,7 +175,7 @@ def findAllRepeats(_args):
         _CHROMOSOME[_whichChromosome.id]['length'] = len(_whichChromosome)
 
     _feature = {'chr': '', 'name': '', 'id': '', 'type': '', 'featureStart': -1, 'featureEnd': -1,
-                'strand': '', 'repeatStart': 0, 'repeatLength': 0, 'exonNumber': -1, 'transcript': ''}
+                'strand': '', 'repeatStart': 0, 'repeatLength': 0, 'featureNumber': -1, 'transcript': ''}
     _numFeatures = 0
     _featureList = {}
     _repeatFwd, _repeatRev = parseDegenerateSequence(_args.repeatSequence)
@@ -229,7 +229,7 @@ def addRepeatsToFeatures(_geneFeatures, _allRepeats):
                     _row['id'] = str(_GOI['id'])
                     _row['featureStart'] = int(_GOI['featureStart'])
                     _row['featureEnd'] = int(_GOI['featureEnd'])
-                    _row['exonNumber'] = _GOI['exonNumber']
+                    _row['featureNumber'] = _GOI['featureNumber']
                     _toAdd[len(_toAdd)] = copy.deepcopy(_row)
 
     _mergedRepeats = _mergedRepeats.append(pd.DataFrame.from_dict(_toAdd, "index"))
@@ -241,7 +241,7 @@ def addRepeatsToFeatures(_geneFeatures, _allRepeats):
 def findRepeatsInGenome(_args):
     logging.info(f"Starting run. Will find all instances of {_args.minRepeats}x({_args.repeatSequence})")
     logging.info(f"Parsing features in gtf file")
-    _gtf = read_gtf(_args.gtfFile)
+    _gtf = read_gtf(_args.inGTFfile)
     _features = parseGTF(_gtf)
 
     logging.info(f"Finding repeats")

@@ -36,23 +36,108 @@ git clone https://github.com/AnkurJainLab/SATCfinder.git
 ```
 
 ## Example usage
-
 <details>
 <summary>Processing an RNA-seq dataset with SATCfinder</summary>
+The SATCfinder pipeline (SATCfinder.sh) takes raw FASTQ reads, trims repeats, removes adapters, and outputs an
+aligned BAM file. A sample HEK293 dataset is provided to test that the pipeline is working properly on your system.
+
+To begin, edit SATCfinder.sh to define variables (such as the raw inputs files and name for output files) and 
+paths (e.g. for your installation of bbtools and STAR genome directory).
+
+For the example dataset:
+```
+# Run SATCfinder.sh.
+./SATCfinder.sh
+
+# Check read selection by bbduk:
+zcat HEK-test_bbduk_cutadapt_1.fastq.gz | wc -l
+# Expected: 7760 lines = 1940 reads per mate
+
+# Check read trimming:
+zcat HEK-test.sam.gz | wc -l
+#Expected: 3462 lines (mate pairs+headers)
+
+# How many trimmed reads were mapped?
+samtools view HEK-test_selected.bam -c
+# Expected: 2081 lines (single repeat-trimmed mates)
+```
 </details>
 
 <details>
-<summary>Find trimmed ends</summary>
+<summary>Finding CAG ends</summary>
+After trimming and alignment, we can find the CAG ends.
+
+Example IGV output for the sample dataset, looking at gene _NONO_ (chrX:71296782-71297103), which has a small
+CAG repeat. 
+
+<img src="SATCfinder_output_IGV.png" height="202" width="620">
+
+To find CAG ends for this region:
+```
+./SATCfinder.py ends 
+--inBAM HEK-test_selected.bam 
+--outTSV HEK-test_selected_NONO_chrX:71296782-71297103.tsv 
+--region chrX:71296782-71297103 
+--strand +
+```
+Examining the output TSV, we find 13 CAG ends at the repeat:
+
+<img src="SATCfinder_read_ends_count.png" height="270" width="212">
+
+If these CAG ends were reflective of splicing, we'd expect:
+1. The CAG ends map far from the repeat tract (human introns are typically >50 bp).
+2. The CAG ends align at an upstream site which resembles a 5' splice site. Based on trimming, we expect the
+CAG ends to align with at the last base of the exon, or at the "G" of the 'G|GT" in the sequence logo. Minor
+variations in CAG end position (typically a multiple of 3 bases) can be seen if the exon terminates in a CAG
+or the repeat has interruptions.
+
+<img src="SATCfinder_5ss_motif.png" height="187" width="279">
 </details>
+
+
 
 <details>
 <summary>Annotating repeats in genomes</summary>
+
+During development of SATCfinder, it was useful to have a strand-aware list of genes with repeats annotated by feature 
+level (gene, exon, intron). The SATCfinder annotate script finds all features in the provided genome and 
+assigns repeats to them. For example, to annotate features with 3 or more CAG repeats (but *not* CTG repeats 
+in the human genome:
+
+```
+./SATCfinder.py annotate
+--inFASTAfile hg38.fa
+--inGTFfile Homo_sapiens.GRCh38.93.canonical.gtf
+--outFile CAG_repeats.gz
+--minRepeats 3
+--repeatSequence CAG
+```
+
+The output of this script is a table with columns:
+```
+chr: chromosome
+name: name or ID of gene in GTF
+id: index
+type: feature type (gene, exon, intron, intergene, ...)
+featureStart: left-most base of feature
+featureEnd: right-most base of feature
+strand: +/-
+repeatStart: left-most base of repeat, regardless of strand. Note that repeatEnd is not defined
+             but can be calculated as repeatStart+(repeatLength*len(repeatMotif))
+repeatLength: number of uninterrupted repeats
+featureNumber: exon or intron number, depending on feature type
+transcript: transcript ID 
+```
+
+Note: the annotation file contains duplicate entries for (1) features without repeat annotations, to
+allow comparison of features with and without repeats, (2) every feature with more than one repeat, because 
+a single feature may have multiple repeat tracts.
+
 </details>
 
 
 
 ## Citation
-If you find this work useful, please cite our publication at TODO
-
-## License
-
+> Anderson, R., Das, M., Chang, Y., Farenhem, K., Schmitz, C. Jain, A.
+> CAG repeat expansions create splicing acceptor sites and produce aberrant repeat-containing RNAs. 
+> 2023 bioRxiv [doi:10.1101/2023.10.16.562581](https://doi.org/10.1101/2023.10.16.562581)

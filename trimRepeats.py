@@ -162,10 +162,12 @@ def trimRepeats(_args):
 
     if _args.outLog != "":
         with open(_args.outLog, "wt") as _logFileOut:
-            _logFileOut.write(f"Run time (s):,{_tDiff // 1}\n")
-            _logFileOut.write(f"Total reads:,{_numReads}\n")
-            _logFileOut.write(f"Reads too short,{_readOutcomes['tooShort']}\n")
-            _logFileOut.write(f"Reads without repeats,{_readOutcomes['noRepeat']}\n")
+            _logFileOut.write(f"Run time (s):\t{_tDiff // 1}\n")
+            _logFileOut.write(f"Total reads:\t{_numReads}\n")
+            _logFileOut.write(f"Reads too short:\t{_readOutcomes['tooShort']}\n")
+            _logFileOut.write(f"Reads without repeats:\t{_readOutcomes['noRepeat']}\n")
+            _logFileOut.write(f"\n")
+            _logFileOut.write(f"Repeat Length\t# reads\n")
             for _i in range(0, len(_repeatDistribution)):
                 _logFileOut.write(f"{_i},{_repeatDistribution[_i]}\n")
 

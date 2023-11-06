@@ -10,11 +10,7 @@ import logging
 
 
 def addArgs(_parser):
-    _parser = argparse.ArgumentParser(prog='SATCfinder ends',
-                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                      description='Module for SATCfinder which locates trimmed ends in a region. '
-                                                  'Outputs a text file with 1-indexed base coordinate of trimmed ends '
-                                                  'and number of ends at that base.')
+
     _parser.add_argument('--inBAM', type=str, default="", required=True,
                          help='Input BAM file to search for trimmed ends. The BAM file should have been processed by '
                               'SATCfinder (e.g. it should have SAM attributes tL/aL to indicate the number of repeats'
@@ -23,6 +19,8 @@ def addArgs(_parser):
                          help='Output TSV file.')
     _parser.add_argument('--region', type=str, default="", required=True,
                          help='Chromosome region to process, for example: chr4:3073876-3075876')
+    _parser.add_argument('--strand', type=str, default="", required=True,
+                     help='Strand of target region')
     _parser.add_argument('--minRepeats', type=int, default=3, required=False,
                          help='Minimum # of repeats required to output. Default 3')
     _parser.add_argument('--ignoreSecondary', action='store_true',
@@ -43,7 +41,9 @@ def find3PrimeEnds(_args):
     _countsPerBase = np.zeros(_end - _start, dtype=int)
     _totalReads = 0
     with pysam.AlignmentFile(_args.inBAM, "rb", check_sq=False) as _fileIn:
-        for _read in _fileIn.fetch(_args.chr, _start, _end):
+        for _read in _fileIn.fetch(_chromosome, _start, _end):
+            _totalReads += 1
+
             if _args.ignoreSecondary:
                 if (_read.flag & 256) != 0:
                     # Skip reads which are not primary alignment
@@ -54,7 +54,7 @@ def find3PrimeEnds(_args):
                     continue
 
             _repeatLength = max([_read.get_tag('tL'), _read.get_tag('aL')])
-            if _repeatLength <= _args.minRepeatLength:
+            if _repeatLength < _args.minRepeats:
                 # Skip reads with no repeats or fewer repeats than desired
                 continue
 
@@ -70,12 +70,13 @@ def find3PrimeEnds(_args):
                 _countsPerBase[len(_countsPerBase) - (_readPositionMax - _start)] += 1
 
     with open(_args.outTSV, "wt") as _fileOut:
-        _fileOut.write(f"base\t{_args.inFile}_{_args.region}\n")
+        _fileOut.write(f"base\t{_args.inBAM}_{_args.region}\n")
         for _i in range(0, len(_countsPerBase)):
-            _fileOut.write("{},{}\n".format(_i + 1, _countsPerBase[_i]))
+            _fileOut.write("{}\t{}\n".format(_i + 1 + _start, _countsPerBase[_i]))
 
-    logging.info(f"Done! Looked at {_totalReads}.")
+    logging.info(f"Done! Looked at {_totalReads} reads.")
 
 
 def main(_args):
     logging.info(f'Starting {__command} module')
+    find3PrimeEnds(_args)
