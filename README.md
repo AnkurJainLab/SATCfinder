@@ -86,7 +86,7 @@ Examining the output TSV, we find 13 CAG ends at the repeat:
 
 If these CAG ends were reflective of splicing, we'd expect:
 1. The CAG ends map far from the repeat tract (human introns are typically >50 bp).
-2. The CAG ends align at an upstream site which resembles a 5' splice site. Based on trimming, we expect the
+2. The CAG ends align at an upstream site which resembles a 5' splice site. After trimming, we expect the
 CAG ends to align with at the last base of the exon, or at the "G" of the 'G|GT" in the sequence logo. Minor
 variations in CAG end position (typically a multiple of 3 bases) can be seen if the exon terminates in a CAG
 or the repeat has interruptions.
@@ -101,7 +101,7 @@ or the repeat has interruptions.
 
 During development of SATCfinder, it was useful to have a strand-aware list of genes with repeats annotated by feature 
 level (gene, exon, intron). The SATCfinder annotate script finds all features in the provided genome and 
-assigns repeats to them. For example, to annotate features with 3 or more CAG repeats (but *not* CTG repeats 
+assigns repeats to them. For example, to annotate features with 3 or more CAG repeats (but *not* CTG repeats) 
 in the human genome:
 
 ```
@@ -129,10 +129,68 @@ featureNumber: exon or intron number, depending on feature type
 transcript: transcript ID 
 ```
 
-Note: the annotation file contains duplicate entries for (1) features without repeat annotations, to
-allow comparison of features with and without repeats, (2) every feature with more than one repeat, because 
-a single feature may have multiple repeat tracts.
+**Note:** the annotation file contains at least one entry for every feature but may contain more. At minimum,
+every feature is included without repeat annotations, to allow comparison of features with and without 
+repeats. Also, every feature with more than one repeat is duplicated, because a single feature may have 
+multiple repeat tracts.
 
+</details>
+
+
+## Command line arguments
+<details>
+<summary>SATCfinder.py trim</summary>
+
+```
+usage: SATCfinder.py trim [-h] --inFASTQ1 x [--inFASTQ2 x] --outSAM x [--note x] --minRepeats x [--UMIlength x] [--minTrimmedLength x]
+                       --repeatSequence x [--outLog x] [--keepAllReads]
+                   
+  --inFASTQ1 x          Path to input read1 fastq file (gzipped)
+  --inFASTQ2 x          (optional) Path to input read2 fastq file (gzipped)
+  --outSAM x            Path to output SAM file (gzipped)
+  --note x              (optional) Note (e.g. dataset ID) to save in read tags. Will be saved with every read, soshould be short and
+                        only contain alphanumeric characters.
+  --minRepeats x        Minimum # of repeats to strip from reads
+  --UMIlength x         Length of UMI (barcode) present, assumed to be first bases in read1
+  --minTrimmedLength x  Minimum length of read after trimming needed to output
+  --repeatSequence x    Forward repeat to strip from reads. Reverse complement is also searched. Degenerate IUPAC bases [RYSWKMBDHVN]
+                        are accepted.
+  --outLog x            (optional) Path to save trimming log file
+  --keepAllReads        (flag) If present, output all reads to SAM file,even those without repeats.
+```
+</details>
+
+<details>
+<summary>SATCfinder.py ends</summary>
+
+```
+usage: SATCfinder.py ends [-h] --inBAM x --outTSV x --region x --strand x [--minRepeats x] [--ignoreSecondary] [--ignoreMultimapping]
+
+  --inBAM x             Input BAM file to search for trimmed ends. The BAM file should have been processed by SATCfinder (e.g. it
+                        should have SAM attributes tL/aL to indicate the number of repeatstrimmed), and must be indexed.
+  --outTSV x            Output TSV file.
+  --region x            Chromosome region to process, for example: chr4:3073876-3075876
+  --strand x            Strand of target region
+  --minRepeats x        Minimum # of repeats required to output. Default 3
+  --ignoreSecondary     If present, ignore secondary alignments of multimapping reads, but include primary alignments.
+  --ignoreMultimapping  If present, ignore all multimapping reads.
+```
+</details>
+
+
+<details>
+<summary>SATCfinder.py annotate</summary>
+
+```
+usage: SATCfinder.py annotate [-h] --inFASTAfile x --inGTFfile x --outFile x --minRepeats x --repeatSequence x
+
+  --inFASTAfile x     Path to genome FASTA file
+  --inGTFfile x       Path to genome annotation file (GTF format)
+  --outFile x         File path to save output dataframe
+  --minRepeats x      Minimum # of times sequence must be repeated without interruption
+  --repeatSequence x  Forward repeat to find in genome. Reverse complement is also searched. Degenerate IUPAC bases [RYSWKMBDHVN] are
+                      accepted but may significantly increase runtime
+```
 </details>
 
 

@@ -11,7 +11,7 @@ import getTrimmedReadEndCounts
 
 def main():
     # setting up to parse arguments. Nothing fancy happens here
-    _parser = argparse.ArgumentParser(prog='SATCfinder', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    _parser = argparse.ArgumentParser(prog='SATCfinder.py', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     _subparsers = _parser.add_subparsers(dest='command', title='Choose a SATCfinder module')
 
     # define modules, each of which has a __command, docstring, and addArgs() function

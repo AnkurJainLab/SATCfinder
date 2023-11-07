@@ -15,27 +15,27 @@ import numpy as np
 
 
 def addArgs(_parser):
-    _parser.add_argument('--inFASTQ1', type=str, default="", required=True,
-                         help='path to input read1 fastq file (gzipped)')
-    _parser.add_argument('--inFASTQ2', type=str, default="", required=False,
-                         help='optional path to input read2 fastq file (gzipped)')
-    _parser.add_argument('--outSAM', type=str, default="", required=True,
-                         help='path to output SAM file (gzipped)')
-    _parser.add_argument('--note', type=str, default="", required=False,
-                         help='Optional note (e.g. dataset ID) to save in read tags. Will be saved with every read, so'
+    _parser.add_argument('--inFASTQ1', type=str, default="", required=True, metavar='x',
+                         help='Path to input read1 fastq file (gzipped)')
+    _parser.add_argument('--inFASTQ2', type=str, default="", required=False, metavar='x',
+                         help='(optional) Path to input read2 fastq file (gzipped)')
+    _parser.add_argument('--outSAM', type=str, default="", required=True, metavar='x',
+                         help='Path to output SAM file (gzipped)')
+    _parser.add_argument('--note', type=str, default="", required=False, metavar='x',
+                         help='(optional) Note (e.g. dataset ID) to save in read tags. Will be saved with every read, so'
                              'should be short and only contain alphanumeric characters.')
-    _parser.add_argument('--minRepeats', type=int, default=3, required=True,
+    _parser.add_argument('--minRepeats', type=int, default=3, required=True, metavar='x',
                          help='Minimum # of repeats to strip from reads')
-    _parser.add_argument('--UMIlength', type=int, default=0, required=False,
+    _parser.add_argument('--UMIlength', type=int, default=0, required=False, metavar='x',
                          help='Length of UMI (barcode) present, assumed to be first bases in read1')
-    _parser.add_argument('--minReadLengthAfterTrim', type=int, default=15, required=False,
+    _parser.add_argument('--minTrimmedLength', type=int, default=15, required=False, metavar='x',
                          help='Minimum length of read after trimming needed to output')
-    _parser.add_argument('--repeatSequence', type=str, default="CAG", required=True,
+    _parser.add_argument('--repeatSequence', type=str, default="CAG", required=True, metavar='x',
                          help='Forward repeat to strip from reads. Reverse complement is also searched. '
                              'Degenerate IUPAC bases [RYSWKMBDHVN] are accepted.')
-    _parser.add_argument('--outLog', type=str, default="", required=False,
-                         help='path to save trimming log file')
-    _parser.add_argument('--keepAllReads', action='store_true', help='If present, output all reads to SAM file,'
+    _parser.add_argument('--outLog', type=str, default="", required=False, metavar='x',
+                         help='(optional) Path to save trimming log file')
+    _parser.add_argument('--keepAllReads', action='store_true', help='(flag) If present, output all reads to SAM file,'
                                                                     'even those without repeats.')
 
     return _parser
@@ -130,14 +130,14 @@ def trimRepeats(_args):
 
         # 0-length reads kill STAR and short reads aren't mappable
         if not _lineIn2:
-            if len(_read1['read']) >= _args.minReadLengthAfterTrim:
+            if len(_read1['read']) >= _args.minTrimmedLength:
                 _processedReads[_i] = _read1
                 _i += 1
                 _readOutcomes['good'] += 1
             else:
                 _readOutcomes['tooShort'] += 1
-        elif len(_read1['read']) >= _args.minReadLengthAfterTrim and \
-                len(_read2['read']) >= _args.minReadLengthAfterTrim:
+        elif len(_read1['read']) >= _args.minTrimmedLength and \
+                len(_read2['read']) >= _args.minTrimmedLength:
             _processedReads[_i] = _read1
             _processedReads[_i + 1] = _read2
             _i += 2

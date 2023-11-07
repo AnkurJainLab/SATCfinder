@@ -11,17 +11,17 @@ import logging
 
 def addArgs(_parser):
 
-    _parser.add_argument('--inBAM', type=str, default="", required=True,
+    _parser.add_argument('--inBAM', type=str, default="", required=True, metavar='x',
                          help='Input BAM file to search for trimmed ends. The BAM file should have been processed by '
                               'SATCfinder (e.g. it should have SAM attributes tL/aL to indicate the number of repeats'
                               'trimmed), and must be indexed.')
-    _parser.add_argument('--outTSV', type=str, default="", required=True,
+    _parser.add_argument('--outTSV', type=str, default="", required=True, metavar='x',
                          help='Output TSV file.')
-    _parser.add_argument('--region', type=str, default="", required=True,
+    _parser.add_argument('--region', type=str, default="", required=True, metavar='x',
                          help='Chromosome region to process, for example: chr4:3073876-3075876')
-    _parser.add_argument('--strand', type=str, default="", required=True,
+    _parser.add_argument('--strand', type=str, default="", required=True, metavar='x',
                      help='Strand of target region')
-    _parser.add_argument('--minRepeats', type=int, default=3, required=False,
+    _parser.add_argument('--minRepeats', type=int, default=3, required=False, metavar='x',
                          help='Minimum # of repeats required to output. Default 3')
     _parser.add_argument('--ignoreSecondary', action='store_true',
                          help='If present, ignore secondary alignments of multimapping reads, but include primary '

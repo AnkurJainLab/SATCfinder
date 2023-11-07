@@ -18,15 +18,15 @@ from commonFunctions import *
 
 
 def addArgs(_parser):
-    _parser.add_argument('--inFASTAfile', type=str, default="", required=True,
+    _parser.add_argument('--inFASTAfile', type=str, default="", required=True, metavar='x',
                         help='Path to genome FASTA file')
-    _parser.add_argument('--inGTFfile', type=str, default="", required=True,
+    _parser.add_argument('--inGTFfile', type=str, default="", required=True, metavar='x',
                         help='Path to genome annotation file (GTF format)')
-    _parser.add_argument('--outFile', type=str, default="", required=True,
+    _parser.add_argument('--outFile', type=str, default="", required=True, metavar='x',
                         help='File path to save output dataframe')
-    _parser.add_argument('--minRepeats', type=int, default="3", required=True,
+    _parser.add_argument('--minRepeats', type=int, default="3", required=True, metavar='x',
                         help='Minimum # of times sequence must be repeated without interruption')
-    _parser.add_argument('--repeatSequence', type=str, default="CAG", required=True,
+    _parser.add_argument('--repeatSequence', type=str, default="CAG", required=True, metavar='x',
                         help='Forward repeat to find in genome. Reverse complement is also searched. '
                              'Degenerate IUPAC bases [RYSWKMBDHVN] are accepted but may significantly increase runtime')
 
