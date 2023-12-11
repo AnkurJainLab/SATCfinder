@@ -255,3 +255,4 @@ def findRepeatsInGenome(_args):
 
 def main(_args):
     logging.info(f'Starting {__command} module')
+    findAllRepeats(_args)
