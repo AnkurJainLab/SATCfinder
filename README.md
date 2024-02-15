@@ -198,4 +198,4 @@ usage: SATCfinder.py annotate [-h] --inFASTAfile x --inGTFfile x --outFile x --m
 ## Citation
 > Anderson, R., Das, M., Chang, Y., Farenhem, K., Schmitz, C. Jain, A.
 > CAG repeat expansions create splicing acceptor sites and produce aberrant repeat-containing RNAs. 
-> 2023 bioRxiv [doi:10.1101/2023.10.16.562581](https://doi.org/10.1101/2023.10.16.562581)
+> 2024 Mol. Cell [doi:10.1016/j.molcel.2024.01.006](https://doi.org/10.1016/j.molcel.2024.01.006)
