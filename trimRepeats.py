@@ -21,7 +21,7 @@ def addArgs(_parser):
                          help='(optional) Path to input read2 fastq file (gzipped)')
     _parser.add_argument('--outSAM', type=str, default="", required=True, metavar='x',
                          help='Path to output SAM file (gzipped)')
-    _parser.add_argument('--note', type=str, default="", required=False, metavar='x',
+    _parser.add_argument('--note', type=str, default="*", required=False, metavar='x',
                          help='(optional) Note (e.g. dataset ID) to save in read tags. Will be saved with every read, so'
                              'should be short and only contain alphanumeric characters.')
     _parser.add_argument('--minRepeats', type=int, default=3, required=True, metavar='x',
@@ -258,9 +258,16 @@ def processReads(_args, _read1, _read2, _findFwdRepeat, _findRevRepeat):
 
 
 def writeRecordsToDisk(_file, _data, _args):
+    # hackish way to add mate pair flags needed by STAR 2.7.10b
+    if _args.inFASTQ2:
+        _mateFlags = ["64", "128"]
+    else:
+        _mateFlags = ["64", "64"]
+    _numLines = 0
+
     for _line in _data.values():
         _output = [_line['ID'],
-                   "0",
+                   _mateFlags[_numLines % 2],
                    '*',
                    '0',
                    '0',
@@ -281,6 +288,7 @@ def writeRecordsToDisk(_file, _data, _args):
                    'pX:Z:' + _line['UMIphred']]
 
         _file.write('\t'.join(_output) + "\n")
+        _numLines += 1
 
 def main(_args):
     logging.info(f'Starting {__command} module')

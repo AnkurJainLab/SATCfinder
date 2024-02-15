@@ -93,7 +93,7 @@ ${STARPath} --genomeDir ${genomeDir} \
 
 # Cleanup
 # Make the output BAM file name nicer
-#mv ${outputDir}/${datasetPrefix}_Aligned.sortedByCoord.out.bam ${outputDir}/${datasetPrefix}.bam
+mv ${outputDir}/${datasetPrefix}_Aligned.sortedByCoord.out.bam ${outputDir}/${datasetPrefix}.bam
 # Index BAM file
 samtools index ${outputDir}/${datasetPrefix}.bam
 # Select only reads that had repeats (aL/tL field is not 0), and stick them in a new indexed BAM file
