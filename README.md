@@ -156,6 +156,10 @@ usage: SATCfinder.py trim [-h] --inFASTQ1 x [--inFASTQ2 x] --outSAM x [--note x]
   --repeatSequence x    Forward repeat to strip from reads. Reverse complement is also searched. Degenerate IUPAC bases [RYSWKMBDHVN]
                         are accepted.
   --outLog x            (optional) Path to save trimming log file
+  --readSuffixDelimiter x
+                        Delimiter between read name and mate suffix. If provided, delimiter and suffix will be removed.
+                        Example (delimiter=/): @HWI-ST182_0249:5:1101:1093:2017/1:ACAGTTCGAT+CCGTACAGGT
+                        Note: to remove a space, use single quotes (--readSuffixDelimiter ' ').
   --keepAllReads        (flag) If present, output all reads to SAM file,even those without repeats.
 ```
 </details>

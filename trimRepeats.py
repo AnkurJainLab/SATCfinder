@@ -37,7 +37,7 @@ def addArgs(_parser):
                          help='(optional) Path to save trimming log file')
     _parser.add_argument('--readSuffixDelimiter', type=str, default="", required=False, metavar='x',
                          help='Delimiter between read name and mate suffix. If provided, delimiter and suffix will be '
-                              ' removed. Example (delimiter=/): @HWI-ST182_0249:5:1101:1093:2017#1:ACAGTTCGAT+CCGTACAGGT')
+                              ' removed. Example (delimiter=/): @HWI-ST182_0249:5:1101:1093:2017/1:ACAGTTCGAT+CCGTACAGGT')
     _parser.add_argument('--keepAllReads', action='store_true', help='(flag) If present, output all reads to SAM file,'
                                                                     'even those without repeats.')
 
