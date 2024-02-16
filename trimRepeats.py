@@ -35,6 +35,9 @@ def addArgs(_parser):
                              'Degenerate IUPAC bases [RYSWKMBDHVN] are accepted.')
     _parser.add_argument('--outLog', type=str, default="", required=False, metavar='x',
                          help='(optional) Path to save trimming log file')
+    _parser.add_argument('--readSuffixDelimiter', type=str, default="", required=False, metavar='x',
+                         help='Delimiter between read name and mate suffix. If provided, delimiter and suffix will be '
+                              ' removed. Example (delimiter=/): @HWI-ST182_0249:5:1101:1093:2017#1:ACAGTTCGAT+CCGTACAGGT')
     _parser.add_argument('--keepAllReads', action='store_true', help='(flag) If present, output all reads to SAM file,'
                                                                     'even those without repeats.')
 
@@ -93,7 +96,7 @@ def trimRepeats(_args):
             continue
 
         # Phase 2: process reads
-        _read1, _read2 = createFASTQreads(_lines)
+        _read1, _read2 = createFASTQreads(_args, _lines)
 
         # Let's not store too much in memory
         if _numReads % 1000000 == 0:
@@ -173,7 +176,7 @@ def trimRepeats(_args):
 
     return 1
 
-def createFASTQreads(_lines):
+def createFASTQreads(_args, _lines):
     # Structure for every read:
     _readBlank = {'read': "",
                   'phred': "",
@@ -200,7 +203,12 @@ def createFASTQreads(_lines):
             # No read 2, skip
             continue
         #   Line 1: save the ID; skip the rest.
-        _whichRead['ID'] = _lines[0][_numRead].strip().replace('@', '').replace(' ', '_')  # Handle spaces in names
+        #   Format read name properly (remove delimiter and suffix) for STAR
+        _whichRead['ID'] = _lines[0][_numRead].strip().replace('@', '')
+        if _args.readSuffixDelimiter:
+            _delimiterPosition = _whichRead['ID'].find(_args.readSuffixDelimiter)
+            _whichRead['ID'] = _whichRead['ID'][:_delimiterPosition]
+
         #   Line 2: save the read seq; skip the rest.
         _whichRead['read'] = _lines[1][_numRead].strip()
         #   Line 3: skip everything entirely.
