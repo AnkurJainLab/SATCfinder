@@ -191,7 +191,7 @@ def findAllRepeats(_args):
                 _f['type'] = "intergene"
                 _f['strand'] = _strand
                 _f['repeatStart'] = _match.start()
-                _f['repeatLength'] = len(_match[0]) // 3
+                _f['repeatLength'] = len(_match[0]) // len(_args.repeatSequence)
 
                 _featureList[_numFeatures] = copy.deepcopy(_f)
                 _numFeatures += 1
